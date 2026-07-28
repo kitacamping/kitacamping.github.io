@@ -1,1 +1,0 @@
-# sewa-alat

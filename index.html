@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Sewa Alat Camping - Admin</title>
+    <!-- Tailwind CSS untuk Tampilan Modern & Responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js untuk Logika Interaktif Ringan -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- SheetJS (xlsx) untuk Export/Import File Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans p-4 md:p-8" x-data="campingApp()">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <!-- Header & Action Buttons -->
+        <header class="bg-emerald-800 text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">⛺ Admin Basecamp Camping</h1>
+                <p class="text-emerald-200 text-sm mt-1">Pendataan Stok & Rekap Transaksi Sewa</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button @click="showModal = true" class="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm transition">
+                    + Sewa Baru
+                </button>
+                <button @click="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-sm border border-emerald-400 transition flex items-center gap-1">
+                    📊 Download Laporan Excel (.xlsx)
+                </button>
+            </div>
+        </header>
+
+        <!-- Grid 1: Transaksi Aktif (Barang Sedang Dipinjam) -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span class="w-3 h-3 bg-amber-500 rounded-full animate-ping"></span>
+                Daftar Barang Sedang Dipinjam
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs">
+                            <th class="p-3">Peminjam / WA</th>
+                            <th class="p-3">Barang Disewa</th>
+                            <th class="p-3 text-center">Qty</th>
+                            <th class="p-3">Tgl Pinjam</th>
+                            <th class="p-3">Jaminan</th>
+                            <th class="p-3 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <template x-for="(t, index) in activeTransactions" :key="t.id">
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3">
+                                    <div class="font-bold text-slate-800" x-text="t.namaPeminjam"></div>
+                                    <div class="text-xs text-slate-400" x-text="t.noWa"></div>
+                                </td>
+                                <td class="p-3 font-semibold text-emerald-700" x-text="t.namaBarang"></td>
+                                <td class="p-3 text-center font-bold" x-text="t.jumlah"></td>
+                                <td class="p-3 text-slate-600" x-text="t.tglPinjam"></td>
+                                <td class="p-3 text-slate-500 italic" x-text="t.catatan || '-'"></td>
+                                <td class="p-3 text-center">
+                                    <button @click="kembalikanBarang(t.id)" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1 rounded-lg text-xs">
+                                        ✓ Kembalikan
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="activeTransactions.length === 0">
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada barang yang sedang disewa.</td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Grid 2: Stok & Katalog Barang -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-800">📦 Stok Inventaris Alat</h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <template x-for="item in items" :key="item.id">
+                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
+                        <div>
+                            <span class="text-xs font-semibold px-2 py-0.5 bg-slate-200 text-slate-600 rounded" x-text="item.kategori"></span>
+                            <h3 class="font-bold text-slate-800 mt-1" x-text="item.nama"></h3>
+                            <p class="text-xs text-slate-500" x-text="'Rp ' + item.harga.toLocaleString('id-ID')"></p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-2xl font-black" :class="item.stokTersedia > 0 ? 'text-emerald-600' : 'text-rose-500'" x-text="item.stokTersedia"></span>
+                            <span class="text-xs text-slate-400 block" x-text="'/ ' + item.stokTotal + ' Unit'"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- Modal Form Sewa Baru -->
+    <div x-show="showModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" x-cloak>
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-lg font-bold border-b pb-2">Input Transaksi Sewa Baru</h3>
+            <form @submit.prevent="simpanSewa()" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Nama Peminjam</label>
+                    <input type="text" x-model="form.namaPeminjam" required class="w-full p-2 border rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">No WhatsApp</label>
+                    <input type="text" x-model="form.noWa" required class="w-full p-2 border rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Pilih Alat Camping</label>
+                    <select x-model="form.barangId" required class="w-full p-2 border rounded-lg text-sm">
+                        <template x-for="item in items" :key="item.id">
+                            <option :value="item.id" x-text="item.nama + ' (Sisa: ' + item.stokTersedia + ')'" :disabled="item.stokTersedia <= 0"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Jumlah Unit</label>
+                        <input type="number" x-model.number="form.jumlah" min="1" required class="w-full p-2 border rounded-lg text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Tanggal Pinjam</label>
+                        <input type="date" x-model="form.tglPinjam" required class="w-full p-2 border rounded-lg text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Jaminan / Catatan</label>
+                    <input type="text" x-model="form.catatan" placeholder="Contoh: KTP Asli" class="w-full p-2 border rounded-lg text-sm">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" @click="showModal = false" class="w-1/2 py-2 border rounded-lg text-sm font-bold">Batal</button>
+                    <button type="submit" class="w-1/2 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Logika & Excel Generator -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('campingApp', () => ({
+                showModal: false,
+                items: JSON.parse(localStorage.getItem('camping_items')) || [
+                    { id: 1, kategori: 'Tenda', nama: 'Tenda Dome 2-3P', stokTotal: 8, stokTersedia: 8, harga: 25000 },
+                    { id: 2, kategori: 'Tenda', nama: 'Tenda Dome 4-5P', stokTotal: 6, stokTersedia: 6, harga: 35000 },
+                    { id: 3, kategori: 'Tas', nama: 'Carrier 60L - 70L', stokTotal: 5, stokTersedia: 5, harga: 20000 },
+                    { id: 4, kategori: 'Tidur', nama: 'Sleeping Bag Polar', stokTotal: 15, stokTersedia: 15, harga: 8000 },
+                    { id: 5, kategori: 'Masak', nama: 'Kompor Windproof', stokTotal: 8, stokTersedia: 8, harga: 10000 },
+                    { id: 6, kategori: 'Masak', nama: 'Cooking Set / Nesting', stokTotal: 8, stokTersedia: 8, harga: 10000 }
+                ],
+                transactions: JSON.parse(localStorage.getItem('camping_trx')) || [],
+                form: { namaPeminjam: '', noWa: '', barangId: 1, jumlah: 1, tglPinjam: new Date().toISOString().split('T')[0], catatan: '' },
+
+                get activeTransactions() {
+                    return this.transactions.filter(t => t.status === 'Dipinjam');
+                },
+
+                simpanSewa() {
+                    let item = this.items.find(i => i.id == this.form.barangId);
+                    if (item && item.stokTersedia >= this.form.jumlah) {
+                        item.stokTersedia -= this.form.jumlah;
+                        
+                        this.transactions.push({
+                            id: Date.now(),
+                            namaPeminjam: this.form.namaPeminjam,
+                            noWa: this.form.noWa,
+                            barangId: item.id,
+                            namaBarang: item.nama,
+                            jumlah: this.form.jumlah,
+                            tglPinjam: this.form.tglPinjam,
+                            catatan: this.form.catatan,
+                            status: 'Dipinjam'
+                        });
+
+                        this.saveData();
+                        this.showModal = false;
+                        this.form.namaPeminjam = ''; this.form.noWa = ''; this.form.catatan = '';
+                    } else {
+                        alert('Stok barang tidak mencukupi!');
+                    }
+                },
+
+                kembalikanBarang(trxId) {
+                    let trx = this.transactions.find(t => t.id === trxId);
+                    if (trx) {
+                        trx.status = 'Selesai';
+                        let item = this.items.find(i => i.id === trx.barangId);
+                        if (item) item.stokTersedia += trx.jumlah;
+                        this.saveData();
+                    }
+                },
+
+                saveData() {
+                    localStorage.setItem('camping_items', JSON.stringify(this.items));
+                    localStorage.setItem('camping_trx', JSON.stringify(this.transactions));
+                },
+
+                // FITUR EXCEL AUTOMATION
+                exportToExcel() {
+                    // Sheet 1: Data Stok Saat Ini
+                    const dataStok = this.items.map(i => ({
+                        'ID Barang': i.id,
+                        'Kategori': i.kategori,
+                        'Nama Alat': i.nama,
+                        'Stok Total': i.stokTotal,
+                        'Stok Tersedia': i.stokTersedia,
+                        'Harga Sewa (Rp)': i.harga
+                    }));
+
+                    // Sheet 2: Seluruh Riwayat Transaksi
+                    const dataTrx = this.transactions.map(t => ({
+                        'ID Transaksi': t.id,
+                        'Nama Peminjam': t.namaPeminjam,
+                        'No WhatsApp': t.noWa,
+                        'Barang Disewa': t.namaBarang,
+                        'Jumlah': t.jumlah,
+                        'Tanggal Pinjam': t.tglPinjam,
+                        'Jaminan/Catatan': t.catatan,
+                        'Status': t.status
+                    }));
+
+                    const wb = XLSX.utils.book_new();
+                    const wsStok = XLSX.utils.json_to_sheet(dataStok);
+                    const wsTrx = XLSX.utils.json_to_sheet(dataTrx);
+
+                    XLSX.utils.book_append_sheet(wb, wsStok, "Stok Barang");
+                    XLSX.utils.book_append_sheet(wb, wsTrx, "Riwayat Transaksi");
+
+                    // Download File Excel
+                    XLSX.writeFile(wb, `Laporan_Sewa_Camping_${new Date().toISOString().split('T')[0]}.xlsx`);
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

@@ -3,243 +3,179 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Sewa Alat Camping - Admin</title>
-    <!-- Tailwind CSS untuk Tampilan Modern & Responsif -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Alpine.js untuk Logika Interaktif Ringan -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <!-- SheetJS (xlsx) untuk Export/Import File Excel -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <title>KitaCamping Banjarbaru - Admin Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans p-4 md:p-8" x-data="campingApp()">
+<body>
 
-    <div class="max-w-6xl mx-auto space-y-6">
-        
-        <!-- Header & Action Buttons -->
-        <header class="bg-emerald-800 text-white p-6 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight">⛺ Admin Basecamp Camping</h1>
-                <p class="text-emerald-200 text-sm mt-1">Pendataan Stok & Rekap Transaksi Sewa</p>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="modal-overlay active">
+        <div class="modal-content login-modal">
+            <div class="logo" style="justify-content: center; margin-bottom: 2rem;">
+                <img src="assets/logo.png" alt="KitaCamping Logo" onerror="this.style.display='none'">
+                <span>KitaCamping Admin</span>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <button @click="showModal = true" class="bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold px-4 py-2 rounded-xl text-sm transition">
-                    + Sewa Baru
-                </button>
-                <button @click="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-sm border border-emerald-400 transition flex items-center gap-1">
-                    📊 Download Laporan Excel (.xlsx)
-                </button>
-            </div>
-        </header>
-
-        <!-- Grid 1: Transaksi Aktif (Barang Sedang Dipinjam) -->
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <span class="w-3 h-3 bg-amber-500 rounded-full animate-ping"></span>
-                Daftar Barang Sedang Dipinjam
-            </h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead>
-                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-xs">
-                            <th class="p-3">Peminjam / WA</th>
-                            <th class="p-3">Barang Disewa</th>
-                            <th class="p-3 text-center">Qty</th>
-                            <th class="p-3">Tgl Pinjam</th>
-                            <th class="p-3">Jaminan</th>
-                            <th class="p-3 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <template x-for="(t, index) in activeTransactions" :key="t.id">
-                            <tr class="hover:bg-slate-50">
-                                <td class="p-3">
-                                    <div class="font-bold text-slate-800" x-text="t.namaPeminjam"></div>
-                                    <div class="text-xs text-slate-400" x-text="t.noWa"></div>
-                                </td>
-                                <td class="p-3 font-semibold text-emerald-700" x-text="t.namaBarang"></td>
-                                <td class="p-3 text-center font-bold" x-text="t.jumlah"></td>
-                                <td class="p-3 text-slate-600" x-text="t.tglPinjam"></td>
-                                <td class="p-3 text-slate-500 italic" x-text="t.catatan || '-'"></td>
-                                <td class="p-3 text-center">
-                                    <button @click="kembalikanBarang(t.id)" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold px-3 py-1 rounded-lg text-xs">
-                                        ✓ Kembalikan
-                                    </button>
-                                </td>
-                            </tr>
-                        </template>
-                        <template x-if="activeTransactions.length === 0">
-                            <tr>
-                                <td colspan="6" class="p-4 text-center text-slate-400 italic">Tidak ada barang yang sedang disewa.</td>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Grid 2: Stok & Katalog Barang -->
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-slate-800">📦 Stok Inventaris Alat</h2>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <template x-for="item in items" :key="item.id">
-                    <div class="border border-slate-200 rounded-xl p-4 bg-slate-50 flex justify-between items-center">
-                        <div>
-                            <span class="text-xs font-semibold px-2 py-0.5 bg-slate-200 text-slate-600 rounded" x-text="item.kategori"></span>
-                            <h3 class="font-bold text-slate-800 mt-1" x-text="item.nama"></h3>
-                            <p class="text-xs text-slate-500" x-text="'Rp ' + item.harga.toLocaleString('id-ID')"></p>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-2xl font-black" :class="item.stokTersedia > 0 ? 'text-emerald-600' : 'text-rose-500'" x-text="item.stokTersedia"></span>
-                            <span class="text-xs text-slate-400 block" x-text="'/ ' + item.stokTotal + ' Unit'"></span>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        </section>
-
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Password Rahasia</label>
+                    <input type="password" id="login-password" required placeholder="Masukkan password...">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Masuk</button>
+            </form>
+            <p id="login-error" style="color: #ef4444; margin-top: 1rem; text-align: center; display: none;">Password salah!</p>
+        </div>
     </div>
 
-    <!-- Modal Form Sewa Baru -->
-    <div x-show="showModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" x-cloak>
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <h3 class="text-lg font-bold border-b pb-2">Input Transaksi Sewa Baru</h3>
-            <form @submit.prevent="simpanSewa()" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Nama Peminjam</label>
-                    <input type="text" x-model="form.namaPeminjam" required class="w-full p-2 border rounded-lg text-sm">
+    <!-- Change Password Modal -->
+    <div id="password-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Ubah Password</h3>
+                <button type="button" class="close-modal" onclick="closePasswordModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="password-form">
+                <div class="form-group">
+                    <label>Password Lama</label>
+                    <input type="password" id="old-password" required>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">No WhatsApp</label>
-                    <input type="text" x-model="form.noWa" required class="w-full p-2 border rounded-lg text-sm">
+                <div class="form-group">
+                    <label>Password Baru</label>
+                    <input type="password" id="new-password" required>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Pilih Alat Camping</label>
-                    <select x-model="form.barangId" required class="w-full p-2 border rounded-lg text-sm">
-                        <template x-for="item in items" :key="item.id">
-                            <option :value="item.id" x-text="item.nama + ' (Sisa: ' + item.stokTersedia + ')'" :disabled="item.stokTersedia <= 0"></option>
-                        </template>
-                    </select>
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Jumlah Unit</label>
-                        <input type="number" x-model.number="form.jumlah" min="1" required class="w-full p-2 border rounded-lg text-sm">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 mb-1">Tanggal Pinjam</label>
-                        <input type="date" x-model="form.tglPinjam" required class="w-full p-2 border rounded-lg text-sm">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Jaminan / Catatan</label>
-                    <input type="text" x-model="form.catatan" placeholder="Contoh: KTP Asli" class="w-full p-2 border rounded-lg text-sm">
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button type="button" @click="showModal = false" class="w-1/2 py-2 border rounded-lg text-sm font-bold">Batal</button>
-                    <button type="submit" class="w-1/2 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold">Simpan</button>
+                <div class="modal-actions">
+                    <button type="button" class="btn filter-btn" onclick="closePasswordModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Script Logika & Excel Generator -->
-    <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('campingApp', () => ({
-                showModal: false,
-                items: JSON.parse(localStorage.getItem('camping_items')) || [
-                    { id: 1, kategori: 'Tenda', nama: 'Tenda Dome 2-3P', stokTotal: 8, stokTersedia: 8, harga: 25000 },
-                    { id: 2, kategori: 'Tenda', nama: 'Tenda Dome 4-5P', stokTotal: 6, stokTersedia: 6, harga: 35000 },
-                    { id: 3, kategori: 'Tas', nama: 'Carrier 60L - 70L', stokTotal: 5, stokTersedia: 5, harga: 20000 },
-                    { id: 4, kategori: 'Tidur', nama: 'Sleeping Bag Polar', stokTotal: 15, stokTersedia: 15, harga: 8000 },
-                    { id: 5, kategori: 'Masak', nama: 'Kompor Windproof', stokTotal: 8, stokTersedia: 8, harga: 10000 },
-                    { id: 6, kategori: 'Masak', nama: 'Cooking Set / Nesting', stokTotal: 8, stokTersedia: 8, harga: 10000 }
-                ],
-                transactions: JSON.parse(localStorage.getItem('camping_trx')) || [],
-                form: { namaPeminjam: '', noWa: '', barangId: 1, jumlah: 1, tglPinjam: new Date().toISOString().split('T')[0], catatan: '' },
+    <!-- Add/Edit Item Modal -->
+    <div id="item-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Tambah Barang</h3>
+                <button type="button" class="close-modal" onclick="closeItemModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="item-form">
+                <input type="hidden" id="item-id">
+                <div class="form-group">
+                    <label>Nama Barang</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="item-category" required>
+                        <option value="tenda">Tenda</option>
+                        <option value="carrier">Tas Carrier</option>
+                        <option value="masak">Alat Masak</option>
+                        <option value="tidur">Alat Tidur</option>
+                        <option value="lainnya">Lainnya</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Harga Sewa (Per Hari)</label>
+                    <input type="number" id="item-price" required>
+                </div>
+                <div class="form-group">
+                    <label>URL Gambar</label>
+                    <input type="url" id="item-image" required placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>Stok Total</label>
+                    <input type="number" id="item-stock-total" required value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Stok Keluar (Sedang Disewa)</label>
+                    <input type="number" id="item-stock-out" required value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Deskripsi</label>
+                    <textarea id="item-desc" rows="3" required></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn filter-btn" onclick="closeItemModal()">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-                get activeTransactions() {
-                    return this.transactions.filter(t => t.status === 'Dipinjam');
-                },
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="logo">
+                <img src="assets/logo.png" alt="KitaCamping Logo" id="navbar-logo" onerror="this.style.display='none'">
+                <span>KitaCamping</span>
+            </div>
+            <div class="nav-links">
+                <a href="#" onclick="openPasswordModal()"><i class="fa-solid fa-key"></i> Ubah Password</a>
+                <a href="#" onclick="logout()" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> Keluar</a>
+            </div>
+        </div>
+    </nav>
 
-                simpanSewa() {
-                    let item = this.items.find(i => i.id == this.form.barangId);
-                    if (item && item.stokTersedia >= this.form.jumlah) {
-                        item.stokTersedia -= this.form.jumlah;
-                        
-                        this.transactions.push({
-                            id: Date.now(),
-                            namaPeminjam: this.form.namaPeminjam,
-                            noWa: this.form.noWa,
-                            barangId: item.id,
-                            namaBarang: item.nama,
-                            jumlah: this.form.jumlah,
-                            tglPinjam: this.form.tglPinjam,
-                            catatan: this.form.catatan,
-                            status: 'Dipinjam'
-                        });
+    <main id="katalog" class="catalog-section" style="padding-top: 8rem;">
+        
+        <!-- Analytics Cards -->
+        <div class="analytics-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="color: var(--primary); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-box-open"></i></div>
+                <div class="stat-info">
+                    <h4 id="stat-total">0</h4>
+                    <p>Total Barang</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-truck-fast"></i></div>
+                <div class="stat-info">
+                    <h4 id="stat-out">0</h4>
+                    <p>Barang Keluar</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1);"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <h4 id="stat-ready">0</h4>
+                    <p>Sisa Barang (Ready)</p>
+                </div>
+            </div>
+        </div>
 
-                        this.saveData();
-                        this.showModal = false;
-                        this.form.namaPeminjam = ''; this.form.noWa = ''; this.form.catatan = '';
-                    } else {
-                        alert('Stok barang tidak mencukupi!');
-                    }
-                },
+        <div class="section-header">
+            <h2>Manajemen <span class="highlight">Inventaris</span></h2>
+        </div>
 
-                kembalikanBarang(trxId) {
-                    let trx = this.transactions.find(t => t.id === trxId);
-                    if (trx) {
-                        trx.status = 'Selesai';
-                        let item = this.items.find(i => i.id === trx.barangId);
-                        if (item) item.stokTersedia += trx.jumlah;
-                        this.saveData();
-                    }
-                },
+        <div class="filters-container">
+            <div class="filters">
+                <button class="filter-btn active" data-filter="all">Semua</button>
+                <button class="filter-btn" data-filter="tenda">Tenda</button>
+                <button class="filter-btn" data-filter="carrier">Tas Carrier</button>
+                <button class="filter-btn" data-filter="masak">Alat Masak</button>
+                <button class="filter-btn" data-filter="tidur">Alat Tidur</button>
+            </div>
+            <button class="btn btn-primary" onclick="openItemModal()"><i class="fa-solid fa-plus"></i> Tambah Barang</button>
+        </div>
 
-                saveData() {
-                    localStorage.setItem('camping_items', JSON.stringify(this.items));
-                    localStorage.setItem('camping_trx', JSON.stringify(this.transactions));
-                },
+        <div id="loading-indicator" style="text-align: center; padding: 2rem; color: var(--primary); display: none;">
+            <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+            <p style="margin-top: 1rem;">Memuat Data...</p>
+        </div>
 
-                // FITUR EXCEL AUTOMATION
-                exportToExcel() {
-                    // Sheet 1: Data Stok Saat Ini
-                    const dataStok = this.items.map(i => ({
-                        'ID Barang': i.id,
-                        'Kategori': i.kategori,
-                        'Nama Alat': i.nama,
-                        'Stok Total': i.stokTotal,
-                        'Stok Tersedia': i.stokTersedia,
-                        'Harga Sewa (Rp)': i.harga
-                    }));
+        <div class="catalog-grid" id="catalog-grid">
+            <!-- Items will be injected here by app.js -->
+        </div>
+    </main>
 
-                    // Sheet 2: Seluruh Riwayat Transaksi
-                    const dataTrx = this.transactions.map(t => ({
-                        'ID Transaksi': t.id,
-                        'Nama Peminjam': t.namaPeminjam,
-                        'No WhatsApp': t.noWa,
-                        'Barang Disewa': t.namaBarang,
-                        'Jumlah': t.jumlah,
-                        'Tanggal Pinjam': t.tglPinjam,
-                        'Jaminan/Catatan': t.catatan,
-                        'Status': t.status
-                    }));
+    <footer id="kontak">
+        <div class="footer-bottom" style="padding: 2rem;">
+            <p>&copy; 2026 KitaCamping Banjarbaru Admin. All rights reserved.</p>
+        </div>
+    </footer>
 
-                    const wb = XLSX.utils.book_new();
-                    const wsStok = XLSX.utils.json_to_sheet(dataStok);
-                    const wsTrx = XLSX.utils.json_to_sheet(dataTrx);
-
-                    XLSX.utils.book_append_sheet(wb, wsStok, "Stok Barang");
-                    XLSX.utils.book_append_sheet(wb, wsTrx, "Riwayat Transaksi");
-
-                    // Download File Excel
-                    XLSX.writeFile(wb, `Laporan_Sewa_Camping_${new Date().toISOString().split('T')[0]}.xlsx`);
-                }
-            }));
-        });
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // --- SUPABASE SETUP ---
 const supabaseUrl = 'https://bwilqtcnalqsiklerfkl.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3aWxxdGNuYWxxc2lrbGVyZmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTY3OTYsImV4cCI6MjEwMDc5Mjc5Nn0.jeCHJRyuEd_vUWI0iIZT8-uW_f61qeE13W4FKnIvlsQ';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+let supabase = null;
 
 // --- STATE ---
 let allItems = [];
@@ -25,6 +25,17 @@ const newPasswordInput = document.getElementById('new-password');
 const itemModal = document.getElementById('item-modal');
 const itemForm = document.getElementById('item-form');
 const modalTitle = document.getElementById('modal-title');
+
+// Initialize Supabase safely
+try {
+    if (window.supabase) {
+        supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+    } else {
+        console.error("Supabase SDK is not loaded.");
+    }
+} catch (e) {
+    console.error("Error initializing Supabase:", e);
+}
 
 // --- AUTHENTICATION (STATIC PASSWORD) ---
 function checkAuth() {
@@ -86,6 +97,12 @@ passwordForm.addEventListener('submit', (e) => {
 async function fetchData() {
     loadingIndicator.style.display = 'block';
     catalogGrid.innerHTML = '';
+    
+    if (!supabase) {
+        catalogGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem; background: var(--bg-card); border-radius: 16px;">Sistem Supabase gagal dimuat. Pastikan Anda terhubung ke internet atau matikan ekstensi AdBlock Anda.</div>';
+        loadingIndicator.style.display = 'none';
+        return;
+    }
     
     try {
         const { data, error } = await supabase

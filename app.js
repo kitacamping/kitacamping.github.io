@@ -23,6 +23,8 @@ window.addEventListener('DOMContentLoaded', function () {
         console.error('Gagal init Supabase:', e);
     }
     checkAuth();
+    // Buka panel peminjaman otomatis saat pertama load
+    toggleLoansPanel();
 });
 
 // ============================================================
@@ -34,7 +36,11 @@ function checkAuth() {
 }
 
 function showLogin()    { document.getElementById('login-overlay').classList.add('active'); }
-function showDashboard(){ document.getElementById('login-overlay').classList.remove('active'); fetchData(); }
+function showDashboard(){
+    document.getElementById('login-overlay').classList.remove('active');
+    fetchData();
+    fetchTransactions();
+}
 
 function handleLogin() {
     var input  = document.getElementById('login-password');
@@ -338,6 +344,7 @@ function submitLoanForm() {
             showToast('Peminjaman berhasil dicatat! Stok berkurang ' + jumlah + ' unit.', 'success');
             closeLoanModal();
             fetchData();
+            fetchTransactions();
         })
         .catch(function (err) { showToast('Error: ' + err.message, 'error'); });
 }
@@ -445,6 +452,145 @@ function showToast(msg, type) {
     t.innerHTML = '<i class="fa-solid fa-' + (type === 'success' ? 'circle-check' : 'circle-exclamation') + '"></i> ' + msg;
     document.body.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.remove(); }, 3500);
+}
+
+// ============================================================
+// LOANS DASHBOARD (DAFTAR PEMINJAMAN AKTIF)
+// ============================================================
+var loansData = [];
+var loansPanelOpen = true; // terbuka by default
+
+function toggleLoansPanel() {
+    loansPanelOpen = !loansPanelOpen;
+    var panel   = document.getElementById('loans-panel');
+    var chevron = document.getElementById('loans-chevron');
+    if (panel)   panel.classList.toggle('open', loansPanelOpen);
+    if (chevron) chevron.classList.toggle('open', loansPanelOpen);
+}
+
+function fetchTransactions() {
+    if (!db) return;
+    var loadEl = document.getElementById('loans-loading');
+    if (loadEl) loadEl.style.display = 'block';
+
+    db.from('transactions')
+        .select('*')
+        .eq('status', 'aktif')
+        .order('id', { ascending: false })
+        .then(function (res) {
+            if (loadEl) loadEl.style.display = 'none';
+            if (res.error) {
+                // Tabel mungkin belum dibuat — tampilkan petunjuk
+                console.warn('Transactions table:', res.error.message);
+                renderTransactionsMissing();
+                return;
+            }
+            loansData = res.data || [];
+            renderTransactions();
+            // Buka panel otomatis jika ada data
+            if (loansData.length > 0 && !loansPanelOpen) toggleLoansPanel();
+        })
+        .catch(function () {
+            if (loadEl) loadEl.style.display = 'none';
+            renderTransactionsMissing();
+        });
+}
+
+function renderTransactionsMissing() {
+    var empty = document.getElementById('loans-empty');
+    var table = document.getElementById('loans-table');
+    var badge = document.getElementById('loan-count-badge');
+    if (empty) {
+        empty.style.display = 'block';
+        empty.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem;margin-bottom:.5rem;display:block;color:var(--primary);"></i>' +
+            'Tabel <b>transactions</b> belum dibuat di Supabase.<br>' +
+            '<span style="font-size:.8rem;color:var(--text-muted);">Jalankan SQL di Supabase → SQL Editor untuk mengaktifkan fitur ini.</span>';
+    }
+    if (table) table.style.display = 'none';
+    if (badge) { badge.textContent = '0'; badge.className = 'loan-badge zero'; }
+    // Pastikan panel terbuka agar pesan terlihat
+    var panel = document.getElementById('loans-panel');
+    if (panel && !loansPanelOpen) toggleLoansPanel();
+}
+
+function renderTransactions() {
+    var tbody  = document.getElementById('loans-tbody');
+    var table  = document.getElementById('loans-table');
+    var empty  = document.getElementById('loans-empty');
+    var badge  = document.getElementById('loan-count-badge');
+
+    if (!tbody) return;
+
+    // Update badge
+    if (badge) {
+        badge.textContent = loansData.length;
+        badge.className   = loansData.length > 0 ? 'loan-badge' : 'loan-badge zero';
+    }
+
+    if (loansData.length === 0) {
+        if (empty) { empty.style.display = 'block'; empty.innerHTML = '<i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:.5rem;display:block;"></i>Tidak ada peminjaman aktif saat ini.'; }
+        if (table) table.style.display = 'none';
+        return;
+    }
+
+    if (empty) empty.style.display = 'none';
+    if (table) table.style.display = 'table';
+
+    tbody.innerHTML = '';
+    for (var i = 0; i < loansData.length; i++) {
+        var tx   = loansData[i];
+        var date = tx.created_at ? new Date(tx.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-';
+        var tr   = document.createElement('tr');
+        tr.innerHTML =
+            '<td>' + (i + 1) + '</td>' +
+            '<td class="loan-name-cell"><i class="fa-solid fa-user" style="color:var(--text-muted);margin-right:.4rem;font-size:.8rem;"></i>' + escHtml(tx.nama_peminjam || '-') + '</td>' +
+            '<td class="loan-item-cell"><i class="fa-solid fa-tent" style="margin-right:.4rem;font-size:.8rem;"></i>' + escHtml(tx.barang_dipinjam || '-') + '</td>' +
+            '<td style="text-align:center;font-weight:700;">' + (tx.jumlah || 1) + ' unit</td>' +
+            '<td style="white-space:nowrap;">' + (tx.lama_peminjaman || '-') + ' ' + (tx.satuan || 'hari') + '</td>' +
+            '<td><span class="loan-jaminan-cell">' + escHtml(tx.jaminan || '-') + '</span></td>' +
+            '<td class="loan-date-cell"><i class="fa-regular fa-calendar" style="margin-right:.3rem;"></i>' + date + '</td>' +
+            '<td><button class="return-btn" onclick="returnItem(' + tx.id + ',' + (tx.item_id || 0) + ',' + (tx.jumlah || 1) + ')">' +
+                '<i class="fa-solid fa-rotate-left"></i> Kembalikan' +
+            '</button></td>';
+        tbody.appendChild(tr);
+    }
+}
+
+function returnItem(txId, itemId, jumlah) {
+    if (!confirm('Konfirmasi pengembalian barang?')) return;
+    if (!db) { showToast('Koneksi tidak tersedia.', 'error'); return; }
+
+    // 1. Tandai transaksi selesai
+    db.from('transactions').update({ status: 'selesai' }).eq('id', txId)
+        .then(function (res) {
+            if (res.error) { showToast('Gagal update transaksi: ' + res.error.message, 'error'); return; }
+
+            // 2. Kurangi stok_keluar item
+            if (itemId) {
+                var item = null;
+                for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === itemId) { item = allItems[i]; break; } }
+                var currentKeluar = item ? (item.stok_keluar || 0) : jumlah;
+                var newKeluar     = Math.max(currentKeluar - jumlah, 0);
+
+                db.from('items').update({ stok_keluar: newKeluar }).eq('id', itemId)
+                    .then(function () {
+                        showToast('Barang berhasil dikembalikan! Stok bertambah ' + jumlah + ' unit.', 'success');
+                        fetchData();
+                        fetchTransactions();
+                    })
+                    .catch(function (err) { showToast('Error update stok: ' + err.message, 'error'); });
+            } else {
+                showToast('Peminjaman ditandai selesai.', 'success');
+                fetchTransactions();
+            }
+        })
+        .catch(function (err) { showToast('Error: ' + err.message, 'error'); });
+}
+
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // ============================================================

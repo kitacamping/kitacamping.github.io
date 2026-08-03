@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KitaCamping Banjarbaru - Admin Dashboard</title>
     <meta name="description" content="Aplikasi inventaris penyewaan alat camping KitaCamping Banjarbaru.">
-    <link rel="stylesheet" href="styles.css?v=6">
+    <link rel="stylesheet" href="styles.css?v=7">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -214,6 +214,44 @@
                 <p>Sisa Barang (Ready)</p>
             </div>
         </div>
+    </div><!-- end analytics-grid -->
+
+    <!-- ===== DAFTAR PEMINJAMAN AKTIF ===== -->
+    <div class="loans-section">
+        <div class="loans-header" onclick="toggleLoansPanel()">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <i class="fa-solid fa-clipboard-list" style="color:var(--primary);font-size:1.2rem;"></i>
+                <h2 style="font-size:1.25rem;font-weight:700;">Daftar Peminjaman Aktif</h2>
+                <span id="loan-count-badge" class="loan-badge">0</span>
+            </div>
+            <i id="loans-chevron" class="fa-solid fa-chevron-down loans-chevron"></i>
+        </div>
+        <div id="loans-panel" class="loans-panel">
+            <div id="loans-loading" style="text-align:center;padding:1.5rem;color:var(--text-muted);display:none;">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Memuat data peminjaman...
+            </div>
+            <div id="loans-empty" style="text-align:center;padding:2rem;color:var(--text-muted);display:none;">
+                <i class="fa-solid fa-inbox" style="font-size:2rem;margin-bottom:.5rem;display:block;"></i>
+                Tidak ada peminjaman aktif saat ini.
+            </div>
+            <div id="loans-table-wrap" style="overflow-x:auto;">
+                <table id="loans-table" class="loans-table" style="display:none;">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nama Peminjam</th>
+                            <th>Barang Dipinjam</th>
+                            <th>Jumlah</th>
+                            <th>Lama</th>
+                            <th>Jaminan</th>
+                            <th>Tgl Pinjam</th>
+                            <th>Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="loans-tbody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <div class="section-header">
@@ -248,6 +286,6 @@
     </div>
 </footer>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

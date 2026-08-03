@@ -188,10 +188,97 @@ html { scroll-behavior: smooth; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
 
+/* ===== LOANS / PEMINJAMAN SECTION ===== */
+.loans-section {
+    background: var(--bg-card);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    margin-bottom: 2.5rem;
+    overflow: hidden;
+}
+.loans-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+}
+.loans-header:hover { background: rgba(255,255,255,0.03); }
+
+.loan-badge {
+    background: var(--primary); color: #fff;
+    font-size: 0.75rem; font-weight: 800;
+    padding: 0.15rem 0.6rem; border-radius: 20px;
+    min-width: 24px; text-align: center;
+}
+.loan-badge.zero { background: var(--text-muted); }
+
+.loans-chevron {
+    color: var(--text-muted); font-size: 1rem;
+    transition: transform 0.3s ease;
+}
+.loans-chevron.open { transform: rotate(180deg); }
+
+.loans-panel {
+    border-top: 1px solid var(--glass-border);
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s ease;
+}
+.loans-panel.open { max-height: 1000px; }
+
+/* Loans Table */
+.loans-table {
+    width: 100%; border-collapse: collapse;
+    font-size: 0.875rem;
+}
+.loans-table thead tr {
+    background: rgba(245,158,11,0.08);
+}
+.loans-table th {
+    padding: 0.75rem 1rem; text-align: left;
+    font-weight: 700; color: var(--primary);
+    font-size: 0.78rem; text-transform: uppercase;
+    letter-spacing: 0.06em; white-space: nowrap;
+}
+.loans-table td {
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--glass-border);
+    vertical-align: middle;
+    color: var(--text-main);
+}
+.loans-table tbody tr { transition: var(--transition); }
+.loans-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+.loan-name-cell { font-weight: 700; }
+.loan-item-cell { color: var(--primary); font-weight: 600; }
+.loan-jaminan-cell {
+    background: rgba(245,158,11,0.1);
+    color: var(--primary);
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+}
+.loan-date-cell { color: var(--text-muted); font-size: 0.82rem; white-space: nowrap; }
+.return-btn {
+    background: rgba(16,185,129,0.15); color: #10b981;
+    border: none; border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.82rem; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+    transition: var(--transition);
+    display: flex; align-items: center; gap: .4rem;
+    white-space: nowrap;
+}
+.return-btn:hover { background: #10b981; color: #fff; }
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
     .filters-container { flex-direction: column; align-items: flex-start; }
     .filters-container .btn { width: 100%; text-align: center; }
     .admin-actions { flex-direction: row; }
     .action-btn { font-size: 0.8rem; }
+    .loans-table th, .loans-table td { padding: 0.6rem 0.75rem; }
 }

@@ -262,6 +262,27 @@ function submitItemForm() {
 // ============================================================
 // LOAN MODAL (TRANSAKSI PEMINJAMAN)
 // ============================================================
+
+// Hitung tanggal harus kembali berdasarkan sekarang + durasi
+function hitungTanggalKembali(lama, satuan) {
+    var d = new Date();
+    if (satuan === 'minggu') {
+        d.setDate(d.getDate() + (lama * 7));
+    } else {
+        // 'hari' atau 'malam'
+        d.setDate(d.getDate() + lama);
+    }
+    return d.toISOString();
+}
+
+// Format tanggal ke tampilan Indonesia
+function formatTanggal(isoStr) {
+    if (!isoStr) return '-';
+    return new Date(isoStr).toLocaleDateString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric'
+    });
+}
+
 function openLoanModal(id) {
     var item = null;
     for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === id) { item = allItems[i]; break; } }
@@ -324,17 +345,19 @@ function submitLoanForm() {
 
     var namaBarang = item.nama || '-';
     var newKeluar  = (item.stok_keluar || 0) + jumlah;
+    var tglKembali = hitungTanggalKembali(lama, satuan);
 
     var txData = {
-        item_id:         itemId,
-        nama_peminjam:   nama,
-        barang_dipinjam: namaBarang,
-        jumlah:          jumlah,
-        lama_peminjaman: lama,
-        satuan:          satuan,
-        jaminan:         jaminan,
-        catatan:         catatan || null,
-        status:          'aktif'
+        item_id:          itemId,
+        nama_peminjam:    nama,
+        barang_dipinjam:  namaBarang,
+        jumlah:           jumlah,
+        lama_peminjaman:  lama,
+        satuan:           satuan,
+        jaminan:          jaminan,
+        catatan:          catatan || null,
+        tanggal_kembali:  tglKembali,
+        status:           'aktif'
     };
 
     if (transactionsAvailable) {
@@ -608,8 +631,42 @@ function renderTransactions() {
     tbody.innerHTML = '';
     for (var i = 0; i < loansData.length; i++) {
         var tx   = loansData[i];
-        var date = tx.created_at ? new Date(tx.created_at).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }) : '-';
-        var tr   = document.createElement('tr');
+        var tglPinjam  = tx.created_at ? formatTanggal(tx.created_at) : '-';
+
+        // Hitung harus kembali: ambil dari DB atau hitung ulang
+        var tglKembali = '-';
+        var isOverdue  = false;
+        var isDueToday = false;
+        if (tx.tanggal_kembali) {
+            tglKembali = formatTanggal(tx.tanggal_kembali);
+            var dueDate = new Date(tx.tanggal_kembali);
+            var today   = new Date();
+            today.setHours(0,0,0,0);
+            dueDate.setHours(0,0,0,0);
+            isOverdue  = dueDate < today;
+            isDueToday = dueDate.getTime() === today.getTime();
+        } else if (tx.lama_peminjaman && tx.created_at) {
+            // Fallback: hitung dari created_at + durasi
+            var base = new Date(tx.created_at);
+            var days = tx.satuan === 'minggu' ? tx.lama_peminjaman * 7 : tx.lama_peminjaman;
+            base.setDate(base.getDate() + days);
+            tglKembali = formatTanggal(base.toISOString());
+            base.setHours(0,0,0,0);
+            var t2 = new Date(); t2.setHours(0,0,0,0);
+            isOverdue  = base < t2;
+            isDueToday = base.getTime() === t2.getTime();
+        }
+
+        // Style untuk kolom harus kembali
+        var dueBg    = isOverdue  ? 'background:rgba(239,68,68,.15);color:#ef4444;' :
+                       isDueToday ? 'background:rgba(245,158,11,.15);color:#f59e0b;' : 'color:var(--text-muted);';
+        var dueIcon  = isOverdue  ? '<i class="fa-solid fa-circle-exclamation" style="margin-right:.3rem;"></i>' :
+                       isDueToday ? '<i class="fa-solid fa-triangle-exclamation" style="margin-right:.3rem;"></i>' :
+                                    '<i class="fa-regular fa-calendar-check" style="margin-right:.3rem;"></i>';
+        var dueLabel = isOverdue ? 'TERLAMBAT! ' + tglKembali : (isDueToday ? 'Hari ini! ' + tglKembali : tglKembali);
+
+        var tr = document.createElement('tr');
+        if (isOverdue) tr.style.cssText = 'background:rgba(239,68,68,.05);';
         tr.innerHTML =
             '<td>' + (i + 1) + '</td>' +
             '<td class="loan-name-cell"><i class="fa-solid fa-user" style="color:var(--text-muted);margin-right:.4rem;font-size:.8rem;"></i>' + escHtml(tx.nama_peminjam || '-') + '</td>' +
@@ -617,7 +674,8 @@ function renderTransactions() {
             '<td style="text-align:center;font-weight:700;">' + (tx.jumlah || 1) + ' unit</td>' +
             '<td style="white-space:nowrap;">' + (tx.lama_peminjaman || '-') + ' ' + (tx.satuan || 'hari') + '</td>' +
             '<td><span class="loan-jaminan-cell">' + escHtml(tx.jaminan || '-') + '</span></td>' +
-            '<td class="loan-date-cell"><i class="fa-regular fa-calendar" style="margin-right:.3rem;"></i>' + date + '</td>' +
+            '<td class="loan-date-cell"><i class="fa-regular fa-calendar" style="margin-right:.3rem;"></i>' + tglPinjam + '</td>' +
+            '<td><span style="' + dueBg + 'padding:.25rem .6rem;border-radius:8px;font-size:.82rem;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;">' + dueIcon + dueLabel + '</span></td>' +
             '<td><button class="return-btn" onclick="returnItem(' + tx.id + ',' + (tx.item_id || 0) + ',' + (tx.jumlah || 1) + ')">' +
                 '<i class="fa-solid fa-rotate-left"></i> Kembalikan' +
             '</button></td>';

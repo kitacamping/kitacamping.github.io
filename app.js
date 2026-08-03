@@ -5,9 +5,10 @@
 var SUPABASE_URL = 'https://bwilqtcnalqsiklerfkl.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3aWxxdGNuYWxxc2lrbGVyZmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTY3OTYsImV4cCI6MjEwMDc5Mjc5Nn0.jeCHJRyuEd_vUWI0iIZT8-uW_f61qeE13W4FKnIvlsQ';
 
-var db          = null;
-var allItems    = [];
-var currentFilter = 'all';
+var db               = null;
+var allItems         = [];
+var currentFilter    = 'all';
+var transactionsAvailable = false; // set true jika tabel transactions sudah ada di Supabase
 
 // ============================================================
 // INIT
@@ -304,49 +305,69 @@ function submitLoanForm() {
     var jaminan  = document.getElementById('loan-jaminan').value.trim();
     var catatan  = document.getElementById('loan-catatan').value.trim();
 
-    if (!nama)    { showToast('Nama peminjam wajib diisi!', 'error'); return; }
-    if (!jaminan) { showToast('Jaminan peminjam wajib diisi!', 'error'); return; }
+    if (!nama)      { showToast('Nama peminjam wajib diisi!', 'error'); return; }
+    if (!jaminan)   { showToast('Jaminan peminjam wajib diisi!', 'error'); return; }
     if (jumlah < 1) { showToast('Jumlah harus minimal 1!', 'error'); return; }
-    if (!db)      { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+    if (!db)        { showToast('Koneksi database tidak tersedia.', 'error'); return; }
 
     // Cek stok terkini
     var item = null;
     for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === itemId) { item = allItems[i]; break; } }
     if (!item) { showToast('Data barang tidak ditemukan!', 'error'); return; }
 
-    var sisa = Math.max((item.stok_total || 0) - (item.stok_keluar || 0), 0);
+    // Hitung sisa stok dari transaksi aktif (konsisten dengan tampilan)
+    var activeBorrowed = getActiveLoanCount(itemId);
+    var sisa = Math.max((item.stok_total || 0) - activeBorrowed, 0);
     if (jumlah > sisa) { showToast('Jumlah melebihi stok yang tersedia (' + sisa + ' unit)!', 'error'); return; }
 
     var namaBarang = item.nama || '-';
     var newKeluar  = (item.stok_keluar || 0) + jumlah;
 
-    // Update stok_keluar item
-    db.from('items').update({ stok_keluar: newKeluar }).eq('id', itemId)
-        .then(function (res) {
-            if (res.error) { showToast('Gagal update stok: ' + res.error.message, 'error'); return; }
+    var txData = {
+        item_id:         itemId,
+        nama_peminjam:   nama,
+        barang_dipinjam: namaBarang,
+        jumlah:          jumlah,
+        lama_peminjaman: lama,
+        satuan:          satuan,
+        jaminan:         jaminan,
+        catatan:         catatan || null,
+        status:          'aktif'
+    };
 
-            // Simpan transaksi (opsional — hanya jika tabel transactions ada)
-            var txData = {
-                item_id:         itemId,
-                nama_peminjam:   nama,
-                barang_dipinjam: namaBarang,
-                jumlah:          jumlah,
-                lama_peminjaman: lama,
-                satuan:          satuan,
-                jaminan:         jaminan,
-                catatan:         catatan || null,
-                status:          'aktif'
-            };
-            db.from('transactions').insert([txData])
-                .then(function () { /* tabel mungkin belum ada, abaikan error */ })
-                .catch(function () { /* sama */ });
+    if (transactionsAvailable) {
+        // --- Tabel transactions TERSEDIA ---
+        // Simpan transaksi dulu, baru update stok_keluar
+        db.from('transactions').insert([txData])
+            .then(function (res) {
+                if (res.error) {
+                    showToast('Gagal simpan transaksi: ' + res.error.message, 'error');
+                    return;
+                }
+                // Transaksi tersimpan → update stok_keluar item
+                db.from('items').update({ stok_keluar: newKeluar }).eq('id', itemId)
+                    .then(function (r2) {
+                        if (r2.error) { showToast('Gagal update stok: ' + r2.error.message, 'error'); return; }
+                        showToast('Peminjaman berhasil dicatat! Stok berkurang ' + jumlah + ' unit.', 'success');
+                        closeLoanModal();
+                        fetchData();
+                        fetchTransactions();
+                    })
+                    .catch(function (err) { showToast('Error update stok: ' + err.message, 'error'); });
+            })
+            .catch(function (err) { showToast('Error simpan transaksi: ' + err.message, 'error'); });
 
-            showToast('Peminjaman berhasil dicatat! Stok berkurang ' + jumlah + ' unit.', 'success');
-            closeLoanModal();
-            fetchData();
-            fetchTransactions();
-        })
-        .catch(function (err) { showToast('Error: ' + err.message, 'error'); });
+    } else {
+        // --- Tabel transactions BELUM ADA → hanya update stok_keluar ---
+        db.from('items').update({ stok_keluar: newKeluar }).eq('id', itemId)
+            .then(function (res) {
+                if (res.error) { showToast('Gagal update stok: ' + res.error.message, 'error'); return; }
+                showToast('Stok diperbarui. Buat tabel transactions di Supabase agar detail peminjam tersimpan!', 'success');
+                closeLoanModal();
+                fetchData();
+            })
+            .catch(function (err) { showToast('Error: ' + err.message, 'error'); });
+    }
 }
 
 // ============================================================
@@ -371,15 +392,26 @@ function formatRupiah(n) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
 }
 
-// Hitung total barang yang sedang dipinjam untuk item tertentu (dari loansData)
+// Hitung total barang yang sedang dipinjam untuk item tertentu
+// Prioritas: dari loansData (transactions). Fallback: stok_keluar dari items.
 function getActiveLoanCount(itemId) {
-    var count = 0;
-    for (var i = 0; i < loansData.length; i++) {
-        if (loansData[i].item_id === itemId) {
-            count += parseInt(loansData[i].jumlah) || 0;
+    if (transactionsAvailable) {
+        var count = 0;
+        for (var i = 0; i < loansData.length; i++) {
+            if (loansData[i].item_id === itemId) {
+                count += parseInt(loansData[i].jumlah) || 0;
+            }
         }
+        return count;
+    } else {
+        // Fallback: baca stok_keluar dari item
+        for (var j = 0; j < allItems.length; j++) {
+            if (allItems[j].id === itemId) {
+                return parseInt(allItems[j].stok_keluar) || 0;
+            }
+        }
+        return 0;
     }
-    return count;
 }
 
 function updateStats() {
@@ -388,10 +420,17 @@ function updateStats() {
         total += parseInt(allItems[i].stok_total) || 0;
     }
 
-    // SUMBER KEBENARAN: hitung dari transaksi aktif, bukan stok_keluar
     var out = 0;
-    for (var j = 0; j < loansData.length; j++) {
-        out += parseInt(loansData[j].jumlah) || 0;
+    if (transactionsAvailable) {
+        // Sumber kebenaran: transaksi aktif
+        for (var j = 0; j < loansData.length; j++) {
+            out += parseInt(loansData[j].jumlah) || 0;
+        }
+    } else {
+        // Fallback: stok_keluar dari items
+        for (var k = 0; k < allItems.length; k++) {
+            out += parseInt(allItems[k].stok_keluar) || 0;
+        }
     }
 
     var el;
@@ -498,11 +537,15 @@ function fetchTransactions() {
         .then(function (res) {
             if (loadEl) loadEl.style.display = 'none';
             if (res.error) {
-                // Tabel mungkin belum dibuat — tampilkan petunjuk
-                console.warn('Transactions table:', res.error.message);
+                transactionsAvailable = false;
+                console.warn('Transactions table error:', res.error.message);
                 renderTransactionsMissing();
+                // Fallback ke stok_keluar
+                updateStats();
+                renderCatalog();
                 return;
             }
+            transactionsAvailable = true;
             loansData = res.data || [];
             renderTransactions();
             // Re-render stats & catalog agar sinkron dengan transaksi aktif
@@ -513,7 +556,10 @@ function fetchTransactions() {
         })
         .catch(function () {
             if (loadEl) loadEl.style.display = 'none';
+            transactionsAvailable = false;
             renderTransactionsMissing();
+            updateStats();
+            renderCatalog();
         });
 }
 

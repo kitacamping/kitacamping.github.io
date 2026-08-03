@@ -5,172 +5,249 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KitaCamping Banjarbaru - Admin Dashboard</title>
     <meta name="description" content="Aplikasi inventaris penyewaan alat camping KitaCamping Banjarbaru.">
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=6">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <!-- ===== LOGIN OVERLAY ===== -->
-    <div id="login-overlay" class="modal-overlay active">
-        <div class="modal-content login-modal">
-            <div class="logo" style="justify-content: center; margin-bottom: 2rem;">
-                <img src="assets/logo.png" alt="KitaCamping Logo" onerror="this.style.display='none'">
-                <span>KitaCamping Admin</span>
-            </div>
-            <div class="form-group">
-                <label>Password Rahasia</label>
-                <input type="password" id="login-password" placeholder="Masukkan password..." onkeydown="if(event.key==='Enter') handleLogin()">
-            </div>
-            <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="handleLogin()">
-                <i class="fa-solid fa-right-to-bracket"></i> Masuk
-            </button>
-            <p id="login-error" style="color: #ef4444; margin-top: 1rem; text-align: center; display: none;">
-                <i class="fa-solid fa-circle-exclamation"></i> Password salah!
-            </p>
+<!-- ===== LOGIN OVERLAY ===== -->
+<div id="login-overlay" class="modal-overlay active">
+    <div class="modal-content login-modal">
+        <div class="logo" style="justify-content:center;margin-bottom:2rem;">
+            <img src="assets/logo.png" alt="KitaCamping Logo" onerror="this.style.display='none'">
+            <span>KitaCamping Admin</span>
         </div>
+        <div class="form-group">
+            <label>Password Rahasia</label>
+            <input type="password" id="login-password" placeholder="Masukkan password..."
+                   onkeydown="if(event.key==='Enter') handleLogin()">
+        </div>
+        <button type="button" class="btn btn-primary" style="width:100%;margin-top:.5rem;" onclick="handleLogin()">
+            <i class="fa-solid fa-right-to-bracket"></i> Masuk
+        </button>
+        <p id="login-error" style="color:#ef4444;margin-top:1rem;text-align:center;display:none;">
+            <i class="fa-solid fa-circle-exclamation"></i> Password salah!
+        </p>
     </div>
+</div>
 
-    <!-- ===== MODAL TAMBAH / EDIT BARANG ===== -->
-    <div id="item-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-title">Tambah Barang</h3>
-                <button type="button" class="close-modal" onclick="closeItemModal()">
-                    <i class="fa-solid fa-xmark"></i>
+<!-- ===== MODAL TAMBAH / EDIT BARANG ===== -->
+<div id="item-modal" class="modal-overlay">
+    <div class="modal-content" style="max-height:90vh;overflow-y:auto;">
+        <div class="modal-header">
+            <h3 id="modal-title">Tambah Barang</h3>
+            <button type="button" class="close-modal" onclick="closeItemModal()">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form id="item-form" action="javascript:void(0)" onsubmit="return false;">
+            <input type="hidden" id="item-id">
+
+            <div class="form-group">
+                <label>Nama Barang</label>
+                <input type="text" id="item-name" required placeholder="Contoh: Tenda Dome 4 Orang">
+            </div>
+
+            <div class="form-group">
+                <label>Kategori</label>
+                <select id="item-category" required>
+                    <option value="tenda">Tenda</option>
+                    <option value="carrier">Tas Carrier</option>
+                    <option value="masak">Alat Masak</option>
+                    <option value="tidur">Alat Tidur</option>
+                    <option value="lainnya">Lainnya</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Harga Sewa (Per Hari / Rp)</label>
+                <input type="number" id="item-price" required min="0" placeholder="Contoh: 50000">
+            </div>
+
+            <div class="form-group">
+                <label>Foto Barang <span style="color:var(--text-muted);font-weight:400;">(Maks. 2 MB)</span></label>
+                <div id="upload-area" class="upload-area" onclick="document.getElementById('item-image-file').click()">
+                    <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                    <p class="upload-text">Klik untuk pilih gambar</p>
+                    <p class="upload-hint">JPG, PNG, WEBP — Maks. 2 MB</p>
+                </div>
+                <input type="file" id="item-image-file" accept="image/*" style="display:none" onchange="handleImageUpload(this)">
+                <div id="image-preview-wrap" style="display:none;margin-top:0.75rem;text-align:center;">
+                    <img id="image-preview" src="" alt="Preview" style="max-height:160px;border-radius:10px;border:1px solid var(--glass-border);object-fit:cover;">
+                    <p id="image-filename" style="color:var(--text-muted);font-size:0.8rem;margin-top:0.4rem;"></p>
+                </div>
+                <p id="image-error" style="color:#ef4444;font-size:0.85rem;margin-top:0.5rem;display:none;">
+                    <i class="fa-solid fa-circle-exclamation"></i> Ukuran file gambar terlalu besar!
+                </p>
+                <input type="hidden" id="item-image-data">
+            </div>
+
+            <div class="form-group">
+                <label>Stok Total</label>
+                <input type="number" id="item-stock-total" required value="1" min="1">
+            </div>
+
+            <div class="form-group">
+                <label>Deskripsi</label>
+                <textarea id="item-desc" rows="3" required placeholder="Deskripsi singkat barang..."></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn filter-btn" onclick="closeItemModal()">Batal</button>
+                <button type="button" class="btn btn-primary" onclick="submitItemForm()">
+                    <i class="fa-solid fa-floppy-disk"></i> Simpan
                 </button>
             </div>
-            <form id="item-form" action="javascript:void(0)" onsubmit="submitItemForm(); return false;">
-                <input type="hidden" id="item-id">
-                <div class="form-group">
-                    <label>Nama Barang</label>
-                    <input type="text" id="item-name" required placeholder="Contoh: Tenda Dome 4 Orang">
-                </div>
-                <div class="form-group">
-                    <label>Kategori</label>
-                    <select id="item-category" required>
-                        <option value="tenda">Tenda</option>
-                        <option value="carrier">Tas Carrier</option>
-                        <option value="masak">Alat Masak</option>
-                        <option value="tidur">Alat Tidur</option>
-                        <option value="lainnya">Lainnya</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Harga Sewa (Per Hari / Rp)</label>
-                    <input type="number" id="item-price" required min="0" placeholder="Contoh: 50000">
-                </div>
-                <div class="form-group">
-                    <label>URL Gambar</label>
-                    <input type="url" id="item-image" required placeholder="https://...">
-                </div>
-                <div class="form-group">
-                    <label>Stok Total</label>
-                    <input type="number" id="item-stock-total" required value="1" min="1">
-                </div>
-                <div class="form-group">
-                    <label>Stok Keluar (Sedang Disewa)</label>
-                    <input type="number" id="item-stock-out" required value="0" min="0">
-                </div>
-                <div class="form-group">
-                    <label>Deskripsi</label>
-                    <textarea id="item-desc" rows="3" required placeholder="Deskripsi singkat barang..."></textarea>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn filter-btn" onclick="closeItemModal()">Batal</button>
-                    <button type="button" class="btn btn-primary" onclick="submitItemForm()">
-                        <i class="fa-solid fa-floppy-disk"></i> Simpan
-                    </button>
-                </div>
-            </form>
-        </div>
+        </form>
     </div>
+</div>
 
-    <!-- ===== NAVBAR ===== -->
-    <nav class="navbar">
-        <div class="nav-content">
-            <div class="logo">
-                <img src="assets/logo.png" alt="KitaCamping Logo" id="navbar-logo" onerror="this.style.display='none'">
-                <span>KitaCamping</span>
-            </div>
-            <div class="nav-links">
-                <a href="#" onclick="handleLogout()" style="color: #ef4444;">
-                    <i class="fa-solid fa-right-from-bracket"></i> Keluar
-                </a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- ===== MAIN CONTENT ===== -->
-    <main id="katalog" class="catalog-section" style="padding-top: 8rem;">
-
-        <!-- Analytics Cards -->
-        <div class="analytics-grid">
-            <div class="stat-card">
-                <div class="stat-icon" style="color: var(--primary); background: rgba(245, 158, 11, 0.1);">
-                    <i class="fa-solid fa-box-open"></i>
-                </div>
-                <div class="stat-info">
-                    <h4 id="stat-total">0</h4>
-                    <p>Total Barang</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);">
-                    <i class="fa-solid fa-truck-fast"></i>
-                </div>
-                <div class="stat-info">
-                    <h4 id="stat-out">0</h4>
-                    <p>Barang Keluar</p>
-                </div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1);">
-                    <i class="fa-solid fa-circle-check"></i>
-                </div>
-                <div class="stat-info">
-                    <h4 id="stat-ready">0</h4>
-                    <p>Sisa Barang (Ready)</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="section-header">
-            <h2>Manajemen <span class="highlight">Inventaris</span></h2>
-        </div>
-
-        <div class="filters-container">
-            <div class="filters">
-                <button class="filter-btn active" onclick="setFilter(this,'all')">Semua</button>
-                <button class="filter-btn" onclick="setFilter(this,'tenda')">Tenda</button>
-                <button class="filter-btn" onclick="setFilter(this,'carrier')">Tas Carrier</button>
-                <button class="filter-btn" onclick="setFilter(this,'masak')">Alat Masak</button>
-                <button class="filter-btn" onclick="setFilter(this,'tidur')">Alat Tidur</button>
-                <button class="filter-btn" onclick="setFilter(this,'lainnya')">Lainnya</button>
-            </div>
-            <button class="btn btn-primary" onclick="openItemModal()">
-                <i class="fa-solid fa-plus"></i> Tambah Barang
+<!-- ===== MODAL TRANSAKSI PEMINJAMAN ===== -->
+<div id="loan-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-handshake" style="color:var(--primary);margin-right:.5rem;"></i>Form Peminjaman</h3>
+            <button type="button" class="close-modal" onclick="closeLoanModal()">
+                <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
 
-        <div id="loading-indicator" style="text-align: center; padding: 2rem; color: var(--primary); display: none;">
-            <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
-            <p style="margin-top: 1rem;">Memuat Data...</p>
+        <!-- Info barang yang dipinjam -->
+        <div id="loan-item-info" class="loan-item-info">
+            <img id="loan-item-img" src="" alt="" onerror="this.style.display='none'">
+            <div>
+                <p id="loan-item-name" class="loan-item-name">-</p>
+                <p id="loan-item-stock" class="loan-item-stock">Sisa stok: -</p>
+            </div>
         </div>
 
-        <div class="catalog-grid" id="catalog-grid">
-            <!-- Items injected by app.js -->
-        </div>
-    </main>
+        <form id="loan-form" action="javascript:void(0)" onsubmit="return false;">
+            <input type="hidden" id="loan-item-id">
 
-    <footer id="kontak">
-        <div class="footer-bottom" style="padding: 2rem;">
-            <p>&copy; 2026 KitaCamping Banjarbaru. All rights reserved.</p>
-        </div>
-    </footer>
+            <div class="form-group">
+                <label>Nama Peminjam</label>
+                <input type="text" id="loan-nama" required placeholder="Nama lengkap peminjam">
+            </div>
 
-    <script src="app.js?v=5"></script>
+            <div class="form-group">
+                <label>Jumlah Dipinjam</label>
+                <input type="number" id="loan-jumlah" required value="1" min="1">
+            </div>
+
+            <div class="form-group">
+                <label>Lama Peminjaman</label>
+                <div style="display:flex;gap:.75rem;align-items:center;">
+                    <input type="number" id="loan-lama" required value="1" min="1" style="width:100px;flex-shrink:0;">
+                    <select id="loan-satuan" style="flex:1;">
+                        <option value="hari">Hari</option>
+                        <option value="malam">Malam</option>
+                        <option value="minggu">Minggu</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Jaminan Peminjam</label>
+                <input type="text" id="loan-jaminan" required placeholder="Contoh: FC KTP, SIM, dll.">
+            </div>
+
+            <div class="form-group">
+                <label>Catatan Tambahan <span style="color:var(--text-muted);font-weight:400;">(opsional)</span></label>
+                <textarea id="loan-catatan" rows="2" placeholder="Kondisi barang, dll."></textarea>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn filter-btn" onclick="closeLoanModal()">Batal</button>
+                <button type="button" class="btn btn-primary" onclick="submitLoanForm()">
+                    <i class="fa-solid fa-paper-plane"></i> Proses Peminjaman
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar">
+    <div class="nav-content">
+        <div class="logo">
+            <img src="assets/logo.png" alt="KitaCamping Logo" onerror="this.style.display='none'">
+            <span>KitaCamping</span>
+        </div>
+        <div class="nav-links">
+            <a href="#" onclick="handleLogout()" style="color:#ef4444;">
+                <i class="fa-solid fa-right-from-bracket"></i> Keluar
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main id="katalog" class="catalog-section" style="padding-top:8rem;">
+
+    <div class="analytics-grid">
+        <div class="stat-card">
+            <div class="stat-icon" style="color:var(--primary);background:rgba(245,158,11,.1);">
+                <i class="fa-solid fa-box-open"></i>
+            </div>
+            <div class="stat-info">
+                <h4 id="stat-total">0</h4>
+                <p>Total Barang</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="color:#ef4444;background:rgba(239,68,68,.1);">
+                <i class="fa-solid fa-truck-fast"></i>
+            </div>
+            <div class="stat-info">
+                <h4 id="stat-out">0</h4>
+                <p>Barang Keluar</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="color:#10b981;background:rgba(16,185,129,.1);">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="stat-info">
+                <h4 id="stat-ready">0</h4>
+                <p>Sisa Barang (Ready)</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-header">
+        <h2>Manajemen <span class="highlight">Inventaris</span></h2>
+    </div>
+
+    <div class="filters-container">
+        <div class="filters">
+            <button class="filter-btn active" onclick="setFilter(this,'all')">Semua</button>
+            <button class="filter-btn" onclick="setFilter(this,'tenda')">Tenda</button>
+            <button class="filter-btn" onclick="setFilter(this,'carrier')">Tas Carrier</button>
+            <button class="filter-btn" onclick="setFilter(this,'masak')">Alat Masak</button>
+            <button class="filter-btn" onclick="setFilter(this,'tidur')">Alat Tidur</button>
+            <button class="filter-btn" onclick="setFilter(this,'lainnya')">Lainnya</button>
+        </div>
+        <button class="btn btn-primary" onclick="openItemModal()">
+            <i class="fa-solid fa-plus"></i> Tambah Barang
+        </button>
+    </div>
+
+    <div id="loading-indicator" style="text-align:center;padding:2rem;color:var(--primary);display:none;">
+        <i class="fa-solid fa-circle-notch fa-spin fa-2x"></i>
+        <p style="margin-top:1rem;">Memuat Data...</p>
+    </div>
+
+    <div class="catalog-grid" id="catalog-grid"></div>
+</main>
+
+<footer id="kontak">
+    <div class="footer-bottom" style="padding:2rem;">
+        <p>&copy; 2026 KitaCamping Banjarbaru. All rights reserved.</p>
+    </div>
+</footer>
+
+<script src="app.js?v=6"></script>
 </body>
 </html>

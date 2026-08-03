@@ -371,12 +371,29 @@ function formatRupiah(n) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
 }
 
+// Hitung total barang yang sedang dipinjam untuk item tertentu (dari loansData)
+function getActiveLoanCount(itemId) {
+    var count = 0;
+    for (var i = 0; i < loansData.length; i++) {
+        if (loansData[i].item_id === itemId) {
+            count += parseInt(loansData[i].jumlah) || 0;
+        }
+    }
+    return count;
+}
+
 function updateStats() {
-    var total = 0, out = 0;
+    var total = 0;
     for (var i = 0; i < allItems.length; i++) {
         total += parseInt(allItems[i].stok_total) || 0;
-        out   += parseInt(allItems[i].stok_keluar) || 0;
     }
+
+    // SUMBER KEBENARAN: hitung dari transaksi aktif, bukan stok_keluar
+    var out = 0;
+    for (var j = 0; j < loansData.length; j++) {
+        out += parseInt(loansData[j].jumlah) || 0;
+    }
+
     var el;
     el = document.getElementById('stat-total'); if (el) el.innerText = total;
     el = document.getElementById('stat-out');   if (el) el.innerText = out;
@@ -401,7 +418,8 @@ function renderCatalog() {
 
     for (var j = 0; j < filtered.length; j++) {
         var item  = filtered[j];
-        var sisa  = Math.max((item.stok_total || 0) - (item.stok_keluar || 0), 0);
+        var activeBorrowed = getActiveLoanCount(item.id);
+        var sisa      = Math.max((item.stok_total || 0) - activeBorrowed, 0);
         var sisaColor = sisa > 0 ? '#10b981' : '#ef4444';
         var sisaLabel = sisa > 0 ? 'Sisa: ' + sisa : 'Habis';
 
@@ -487,6 +505,9 @@ function fetchTransactions() {
             }
             loansData = res.data || [];
             renderTransactions();
+            // Re-render stats & catalog agar sinkron dengan transaksi aktif
+            updateStats();
+            renderCatalog();
             // Buka panel otomatis jika ada data
             if (loansData.length > 0 && !loansPanelOpen) toggleLoansPanel();
         })

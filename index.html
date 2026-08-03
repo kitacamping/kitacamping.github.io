@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KitaCamping Banjarbaru - Admin Dashboard</title>
-    <link rel="stylesheet" href="styles.css?v=2">
+    <meta name="description" content="Aplikasi inventaris penyewaan alat camping KitaCamping Banjarbaru.">
+    <link rel="stylesheet" href="styles.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Supabase SDK -->
@@ -12,60 +13,40 @@
 </head>
 <body>
 
-    <!-- Login Overlay -->
+    <!-- ===== LOGIN OVERLAY ===== -->
     <div id="login-overlay" class="modal-overlay active">
         <div class="modal-content login-modal">
             <div class="logo" style="justify-content: center; margin-bottom: 2rem;">
                 <img src="assets/logo.png" alt="KitaCamping Logo" onerror="this.style.display='none'">
                 <span>KitaCamping Admin</span>
             </div>
-            <form id="login-form" action="javascript:void(0)" onsubmit="handleLogin(); return false;">
-                <div class="form-group">
-                    <label>Password Rahasia</label>
-                    <input type="password" id="login-password" required placeholder="Masukkan password...">
-                </div>
-                <button type="button" class="btn btn-primary" style="width: 100%;" onclick="handleLogin()">Masuk</button>
-            </form>
-            <p id="login-error" style="color: #ef4444; margin-top: 1rem; text-align: center; display: none;">Password salah!</p>
-        </div>
-    </div>
-
-    <!-- Change Password Modal -->
-    <div id="password-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Ubah Password</h3>
-                <button type="button" class="close-modal" onclick="closePasswordModal()"><i class="fa-solid fa-xmark"></i></button>
+            <div class="form-group">
+                <label>Password Rahasia</label>
+                <input type="password" id="login-password" placeholder="Masukkan password..." onkeydown="if(event.key==='Enter') handleLogin()">
             </div>
-            <form id="password-form">
-                <div class="form-group">
-                    <label>Password Lama</label>
-                    <input type="password" id="old-password" required>
-                </div>
-                <div class="form-group">
-                    <label>Password Baru</label>
-                    <input type="password" id="new-password" required>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn filter-btn" onclick="closePasswordModal()">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
-                </div>
-            </form>
+            <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;" onclick="handleLogin()">
+                <i class="fa-solid fa-right-to-bracket"></i> Masuk
+            </button>
+            <p id="login-error" style="color: #ef4444; margin-top: 1rem; text-align: center; display: none;">
+                <i class="fa-solid fa-circle-exclamation"></i> Password salah!
+            </p>
         </div>
     </div>
 
-    <!-- Add/Edit Item Modal -->
+    <!-- ===== MODAL TAMBAH / EDIT BARANG ===== -->
     <div id="item-modal" class="modal-overlay">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modal-title">Tambah Barang</h3>
-                <button type="button" class="close-modal" onclick="closeItemModal()"><i class="fa-solid fa-xmark"></i></button>
+                <button type="button" class="close-modal" onclick="closeItemModal()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
             </div>
-            <form id="item-form">
+            <form id="item-form" action="javascript:void(0)" onsubmit="submitItemForm(); return false;">
                 <input type="hidden" id="item-id">
                 <div class="form-group">
                     <label>Nama Barang</label>
-                    <input type="text" id="item-name" required>
+                    <input type="text" id="item-name" required placeholder="Contoh: Tenda Dome 4 Orang">
                 </div>
                 <div class="form-group">
                     <label>Kategori</label>
@@ -78,8 +59,8 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Harga Sewa (Per Hari)</label>
-                    <input type="number" id="item-price" required>
+                    <label>Harga Sewa (Per Hari / Rp)</label>
+                    <input type="number" id="item-price" required min="0" placeholder="Contoh: 50000">
                 </div>
                 <div class="form-group">
                     <label>URL Gambar</label>
@@ -95,16 +76,19 @@
                 </div>
                 <div class="form-group">
                     <label>Deskripsi</label>
-                    <textarea id="item-desc" rows="3" required></textarea>
+                    <textarea id="item-desc" rows="3" required placeholder="Deskripsi singkat barang..."></textarea>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn filter-btn" onclick="closeItemModal()">Batal</button>
-                    <button type="submit" class="btn btn-primary">Simpan</button>
+                    <button type="button" class="btn btn-primary" onclick="submitItemForm()">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- ===== NAVBAR ===== -->
     <nav class="navbar">
         <div class="nav-content">
             <div class="logo">
@@ -112,32 +96,40 @@
                 <span>KitaCamping</span>
             </div>
             <div class="nav-links">
-                <a href="#" onclick="openPasswordModal()"><i class="fa-solid fa-key"></i> Ubah Password</a>
-                <a href="#" onclick="logout()" style="color: #ef4444;"><i class="fa-solid fa-right-from-bracket"></i> Keluar</a>
+                <a href="#" onclick="handleLogout()" style="color: #ef4444;">
+                    <i class="fa-solid fa-right-from-bracket"></i> Keluar
+                </a>
             </div>
         </div>
     </nav>
 
+    <!-- ===== MAIN CONTENT ===== -->
     <main id="katalog" class="catalog-section" style="padding-top: 8rem;">
-        
+
         <!-- Analytics Cards -->
         <div class="analytics-grid">
             <div class="stat-card">
-                <div class="stat-icon" style="color: var(--primary); background: rgba(245, 158, 11, 0.1);"><i class="fa-solid fa-box-open"></i></div>
+                <div class="stat-icon" style="color: var(--primary); background: rgba(245, 158, 11, 0.1);">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
                 <div class="stat-info">
                     <h4 id="stat-total">0</h4>
                     <p>Total Barang</p>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);"><i class="fa-solid fa-truck-fast"></i></div>
+                <div class="stat-icon" style="color: #ef4444; background: rgba(239, 68, 68, 0.1);">
+                    <i class="fa-solid fa-truck-fast"></i>
+                </div>
                 <div class="stat-info">
                     <h4 id="stat-out">0</h4>
                     <p>Barang Keluar</p>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1);"><i class="fa-solid fa-check-circle"></i></div>
+                <div class="stat-icon" style="color: #10b981; background: rgba(16, 185, 129, 0.1);">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
                 <div class="stat-info">
                     <h4 id="stat-ready">0</h4>
                     <p>Sisa Barang (Ready)</p>
@@ -156,8 +148,11 @@
                 <button class="filter-btn" data-filter="carrier">Tas Carrier</button>
                 <button class="filter-btn" data-filter="masak">Alat Masak</button>
                 <button class="filter-btn" data-filter="tidur">Alat Tidur</button>
+                <button class="filter-btn" data-filter="lainnya">Lainnya</button>
             </div>
-            <button class="btn btn-primary" onclick="openItemModal()"><i class="fa-solid fa-plus"></i> Tambah Barang</button>
+            <button class="btn btn-primary" onclick="openItemModal()">
+                <i class="fa-solid fa-plus"></i> Tambah Barang
+            </button>
         </div>
 
         <div id="loading-indicator" style="text-align: center; padding: 2rem; color: var(--primary); display: none;">
@@ -166,35 +161,16 @@
         </div>
 
         <div class="catalog-grid" id="catalog-grid">
-            <!-- Items will be injected here by app.js -->
+            <!-- Items injected by app.js -->
         </div>
     </main>
 
     <footer id="kontak">
         <div class="footer-bottom" style="padding: 2rem;">
-            <p>&copy; 2026 KitaCamping Banjarbaru Admin. All rights reserved.</p>
+            <p>&copy; 2026 KitaCamping Banjarbaru. All rights reserved.</p>
         </div>
     </footer>
 
-    <script src="app.js?v=3"></script>
-    <script>
-    // INLINE LOGIN HANDLER - tidak bisa di-cache browser
-    function handleLogin() {
-        var pw = document.getElementById('login-password').value;
-        var saved = localStorage.getItem('adminPassword') || 'YUKCAMPING';
-        var errEl = document.getElementById('login-error');
-        var overlay = document.getElementById('login-overlay');
-        if (pw === saved) {
-            localStorage.setItem('isAdmin', 'true');
-            overlay.classList.remove('active');
-            if (errEl) errEl.style.display = 'none';
-            document.getElementById('login-password').value = '';
-            if (typeof fetchData === 'function') fetchData();
-        } else {
-            if (errEl) errEl.style.display = 'block';
-        }
-        return false;
-    }
-    </script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

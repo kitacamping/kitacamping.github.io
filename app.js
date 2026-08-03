@@ -1,281 +1,337 @@
-// --- SUPABASE SETUP ---
-const supabaseUrl = 'https://bwilqtcnalqsiklerfkl.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3aWxxdGNuYWxxc2lrbGVyZmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTY3OTYsImV4cCI6MjEwMDc5Mjc5Nn0.jeCHJRyuEd_vUWI0iIZT8-uW_f61qeE13W4FKnIvlsQ';
-let supabase = null;
+// ============================================================
+// KITACAMPING INVENTARIS — app.js v4
+// ============================================================
 
-// --- STATE ---
+// --- SUPABASE SETUP ---
+const SUPABASE_URL = 'https://bwilqtcnalqsiklerfkl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3aWxxdGNuYWxxc2lrbGVyZmtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyMTY3OTYsImV4cCI6MjEwMDc5Mjc5Nn0.jeCHJRyuEd_vUWI0iIZT8-uW_f61qeE13W4FKnIvlsQ';
+
+let db = null;
 let allItems = [];
 let currentFilter = 'all';
 
-// --- DOM ELEMENTS ---
-const catalogGrid = document.getElementById('catalog-grid');
-const loadingIndicator = document.getElementById('loading-indicator');
-const filterBtns = document.querySelectorAll('.filter-btn');
-
-const loginOverlay = document.getElementById('login-overlay');
-const loginForm = document.getElementById('login-form');
-const loginPasswordInput = document.getElementById('login-password');
-const loginError = document.getElementById('login-error');
-
-const passwordModal = document.getElementById('password-modal');
-const passwordForm = document.getElementById('password-form');
-const oldPasswordInput = document.getElementById('old-password');
-const newPasswordInput = document.getElementById('new-password');
-
-const itemModal = document.getElementById('item-modal');
-const itemForm = document.getElementById('item-form');
-const modalTitle = document.getElementById('modal-title');
-
-// Initialize Supabase safely
-try {
-    if (window.supabase) {
-        supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-    } else {
-        console.error("Supabase SDK is not loaded.");
-    }
-} catch (e) {
-    console.error("Error initializing Supabase:", e);
-}
-
-// --- AUTHENTICATION (STATIC PASSWORD) ---
-function checkAuth() {
-    const isAuth = localStorage.getItem('isAdmin');
-    if (isAuth === 'true') {
-        loginOverlay.classList.remove('active');
-        fetchData();
-    } else {
-        loginOverlay.classList.add('active');
-    }
-}
-
-function getSavedPassword() {
-    return localStorage.getItem('adminPassword') || 'YUKCAMPING';
-}
-
-loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const pw = loginPasswordInput.value;
-    if (pw === getSavedPassword()) {
-        localStorage.setItem('isAdmin', 'true');
-        loginOverlay.classList.remove('active');
-        loginError.style.display = 'none';
-        loginPasswordInput.value = '';
-        fetchData();
-    } else {
-        loginError.style.display = 'block';
-    }
-});
-
-function logout() {
-    localStorage.removeItem('isAdmin');
-    loginOverlay.classList.add('active');
-}
-
-// --- PASSWORD MANAGEMENT ---
-function openPasswordModal() { passwordModal.classList.add('active'); }
-function closePasswordModal() { 
-    passwordModal.classList.remove('active'); 
-    passwordForm.reset();
-}
-
-passwordForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const oldPw = oldPasswordInput.value;
-    const newPw = newPasswordInput.value;
-    
-    if (oldPw !== getSavedPassword()) {
-        alert("Password lama salah!");
-        return;
-    }
-    
-    localStorage.setItem('adminPassword', newPw);
-    alert("Password berhasil diubah!");
-    closePasswordModal();
-});
-
-// --- DATA FETCHING (SUPABASE) ---
-async function fetchData() {
-    loadingIndicator.style.display = 'block';
-    catalogGrid.innerHTML = '';
-    
-    if (!supabase) {
-        catalogGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem; background: var(--bg-card); border-radius: 16px;">Sistem Supabase gagal dimuat. Pastikan Anda terhubung ke internet atau matikan ekstensi AdBlock Anda.</div>';
-        loadingIndicator.style.display = 'none';
-        return;
-    }
-    
+// Init Supabase setelah halaman selesai dimuat
+window.addEventListener('DOMContentLoaded', () => {
     try {
-        const { data, error } = await supabase
+        if (window.supabase) {
+            db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log('Supabase terhubung.');
+        } else {
+            console.error('Supabase SDK tidak ditemukan.');
+        }
+    } catch (e) {
+        console.error('Gagal inisialisasi Supabase:', e);
+    }
+
+    checkAuth();
+    initFilterButtons();
+});
+
+// ============================================================
+// AUTENTIKASI
+// ============================================================
+
+function checkAuth() {
+    const isAuth = localStorage.getItem('kc_isAdmin');
+    if (isAuth === 'true') {
+        showDashboard();
+    } else {
+        showLogin();
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-overlay').classList.add('active');
+}
+
+function showDashboard() {
+    document.getElementById('login-overlay').classList.remove('active');
+    fetchData();
+}
+
+// Dipanggil dari tombol "Masuk" di HTML (onclick)
+function handleLogin() {
+    const pw = document.getElementById('login-password').value.trim();
+    const correct = 'YUKCAMPING';
+    const errEl = document.getElementById('login-error');
+
+    if (!pw) return;
+
+    if (pw === correct) {
+        localStorage.setItem('kc_isAdmin', 'true');
+        errEl.style.display = 'none';
+        document.getElementById('login-password').value = '';
+        showDashboard();
+    } else {
+        errEl.style.display = 'block';
+    }
+}
+
+// Dipanggil dari tombol "Keluar" di navbar
+function handleLogout() {
+    localStorage.removeItem('kc_isAdmin');
+    showLogin();
+}
+
+// ============================================================
+// DATA — SUPABASE CRUD
+// ============================================================
+
+async function fetchData() {
+    const grid = document.getElementById('catalog-grid');
+    const loader = document.getElementById('loading-indicator');
+
+    loader.style.display = 'block';
+    grid.innerHTML = '';
+
+    if (!db) {
+        grid.innerHTML = errorBox('Koneksi Supabase gagal. Pastikan Anda terhubung ke internet dan coba refresh halaman.');
+        loader.style.display = 'none';
+        return;
+    }
+
+    try {
+        const { data, error } = await db
             .from('items')
             .select('*')
-            .order('id', { ascending: false });
-            
+            .order('created_at', { ascending: false });
+
         if (error) throw error;
-        
+
         allItems = data || [];
-        updateAnalytics();
+        updateStats();
         renderCatalog();
     } catch (err) {
-        console.error("Error fetching data:", err);
-        // Fallback or alert if table doesn't exist yet
-        if(err.message.includes('relation "public.items" does not exist')) {
-            catalogGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 2rem; background: var(--bg-card); border-radius: 16px;">Tabel "items" belum dibuat di Supabase. Silakan jalankan perintah SQL yang diberikan oleh AI.</div>';
-        } else {
-            alert("Gagal mengambil data: " + err.message);
-        }
+        console.error('fetchData error:', err);
+        grid.innerHTML = errorBox('Gagal memuat data: ' + err.message);
     } finally {
-        loadingIndicator.style.display = 'none';
+        loader.style.display = 'none';
     }
 }
 
-// --- ANALYTICS ---
-function updateAnalytics() {
-    let total = 0;
-    let out = 0;
-    
-    allItems.forEach(item => {
-        total += (parseInt(item.stok_total) || 0);
-        out += (parseInt(item.stok_keluar) || 0);
-    });
-    
-    let ready = total - out;
-    if(ready < 0) ready = 0;
-    
-    document.getElementById('stat-total').innerText = total;
-    document.getElementById('stat-out').innerText = out;
-    document.getElementById('stat-ready').innerText = ready;
-}
+// Dipanggil dari tombol "Simpan" di modal (onclick)
+async function submitItemForm() {
+    const id       = document.getElementById('item-id').value;
+    const nama     = document.getElementById('item-name').value.trim();
+    const kategori = document.getElementById('item-category').value;
+    const harga    = parseInt(document.getElementById('item-price').value) || 0;
+    const gambar   = document.getElementById('item-image').value.trim();
+    const total    = parseInt(document.getElementById('item-stock-total').value) || 1;
+    const keluar   = parseInt(document.getElementById('item-stock-out').value) || 0;
+    const deskripsi= document.getElementById('item-desc').value.trim();
 
-// --- RENDER CATALOG ---
-const formatRupiah = (number) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-};
-
-function renderCatalog() {
-    catalogGrid.innerHTML = '';
-    
-    let filteredData = allItems;
-    if (currentFilter !== 'all') {
-        filteredData = allItems.filter(item => item.kategori === currentFilter);
-    }
-    
-    if (filteredData.length === 0) {
-        catalogGrid.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--text-muted);">Tidak ada barang ditemukan.</p>';
+    // Validasi sederhana
+    if (!nama || !gambar || !deskripsi) {
+        showToast('Harap isi semua kolom!', 'error');
         return;
     }
-    
-    filteredData.forEach(item => {
-        const sisa = (item.stok_total || 0) - (item.stok_keluar || 0);
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <div class="card-img-wrapper">
-                <img src="${item.gambar_url || 'https://via.placeholder.com/300?text=No+Image'}" alt="${item.nama}" class="card-img" onerror="this.src='https://via.placeholder.com/300?text=Error'">
-                <div class="stock-badge" style="color: ${sisa > 0 ? '#10b981' : '#ef4444'};">
-                    Sisa: ${sisa > 0 ? sisa : 'Habis'}
-                </div>
-            </div>
-            <div class="card-content">
-                <span class="card-category">${item.kategori}</span>
-                <h3 class="card-title">${item.nama}</h3>
-                <p class="card-desc">${item.deskripsi}</p>
-                <div class="price">${formatRupiah(item.harga)}<span>/hari</span></div>
-                
-                <div class="admin-actions">
-                    <button class="action-btn edit-btn" onclick="openEditModal(${item.id})"><i class="fa-solid fa-pen"></i> Edit</button>
-                    <button class="action-btn del-btn" onclick="deleteItem(${item.id})"><i class="fa-solid fa-trash"></i> Hapus</button>
-                </div>
-            </div>
-        `;
-        catalogGrid.appendChild(card);
-    });
+    if (keluar > total) {
+        showToast('Stok keluar tidak boleh melebihi stok total!', 'error');
+        return;
+    }
+
+    const payload = { nama, kategori, harga, gambar_url: gambar, stok_total: total, stok_keluar: keluar, deskripsi };
+
+    if (!db) {
+        showToast('Koneksi database tidak tersedia.', 'error');
+        return;
+    }
+
+    try {
+        if (id) {
+            // UPDATE
+            const { error } = await db.from('items').update(payload).eq('id', parseInt(id));
+            if (error) throw error;
+            showToast('Barang berhasil diperbarui!', 'success');
+        } else {
+            // INSERT
+            const { error } = await db.from('items').insert([payload]);
+            if (error) throw error;
+            showToast('Barang berhasil ditambahkan!', 'success');
+        }
+        closeItemModal();
+        fetchData();
+    } catch (err) {
+        console.error('submitItemForm error:', err);
+        showToast('Gagal menyimpan: ' + err.message, 'error');
+    }
 }
 
-// --- FILTERING ---
-filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.getAttribute('data-filter');
-        renderCatalog();
-    });
-});
+async function deleteItem(id) {
+    if (!confirm('Yakin ingin menghapus barang ini?')) return;
 
-// --- ITEM MANAGEMENT (CRUD) ---
+    if (!db) { showToast('Koneksi database tidak tersedia.', 'error'); return; }
+
+    try {
+        const { error } = await db.from('items').delete().eq('id', id);
+        if (error) throw error;
+        showToast('Barang berhasil dihapus!', 'success');
+        fetchData();
+    } catch (err) {
+        console.error('deleteItem error:', err);
+        showToast('Gagal menghapus: ' + err.message, 'error');
+    }
+}
+
+// ============================================================
+// MODAL BARANG
+// ============================================================
+
 function openItemModal() {
-    modalTitle.innerText = 'Tambah Barang Baru';
+    document.getElementById('modal-title').innerText = 'Tambah Barang Baru';
     document.getElementById('item-id').value = '';
-    itemForm.reset();
-    itemModal.classList.add('active');
+    document.getElementById('item-form').reset();
+    // Reset default values
+    document.getElementById('item-stock-total').value = '1';
+    document.getElementById('item-stock-out').value = '0';
+    document.getElementById('item-modal').classList.add('active');
 }
 
 function openEditModal(id) {
     const item = allItems.find(i => i.id === id);
-    if(!item) return;
-    
-    modalTitle.innerText = 'Edit Barang';
-    document.getElementById('item-id').value = item.id;
-    document.getElementById('item-name').value = item.nama;
-    document.getElementById('item-category').value = item.kategori;
-    document.getElementById('item-price').value = item.harga;
-    document.getElementById('item-image').value = item.gambar_url;
-    document.getElementById('item-stock-total').value = item.stok_total;
-    document.getElementById('item-stock-out').value = item.stok_keluar;
-    document.getElementById('item-desc').value = item.deskripsi;
-    
-    itemModal.classList.add('active');
+    if (!item) { showToast('Data barang tidak ditemukan.', 'error'); return; }
+
+    document.getElementById('modal-title').innerText = 'Edit Barang';
+    document.getElementById('item-id').value            = item.id;
+    document.getElementById('item-name').value          = item.nama || '';
+    document.getElementById('item-category').value      = item.kategori || 'lainnya';
+    document.getElementById('item-price').value         = item.harga || 0;
+    document.getElementById('item-image').value         = item.gambar_url || '';
+    document.getElementById('item-stock-total').value   = item.stok_total || 1;
+    document.getElementById('item-stock-out').value     = item.stok_keluar || 0;
+    document.getElementById('item-desc').value          = item.deskripsi || '';
+
+    document.getElementById('item-modal').classList.add('active');
 }
 
 function closeItemModal() {
-    itemModal.classList.remove('active');
+    document.getElementById('item-modal').classList.remove('active');
+    document.getElementById('item-form').reset();
 }
 
-itemForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const id = document.getElementById('item-id').value;
-    const itemData = {
-        nama: document.getElementById('item-name').value,
-        kategori: document.getElementById('item-category').value,
-        harga: parseInt(document.getElementById('item-price').value),
-        gambar_url: document.getElementById('item-image').value,
-        stok_total: parseInt(document.getElementById('item-stock-total').value),
-        stok_keluar: parseInt(document.getElementById('item-stock-out').value),
-        deskripsi: document.getElementById('item-desc').value,
-    };
-    
-    try {
-        if (id) {
-            // Update
-            const { error } = await supabase.from('items').update(itemData).eq('id', id);
-            if (error) throw error;
-            alert("Barang berhasil diperbarui!");
-        } else {
-            // Insert
-            const { error } = await supabase.from('items').insert([itemData]);
-            if (error) throw error;
-            alert("Barang berhasil ditambahkan!");
-        }
-        closeItemModal();
-        fetchData(); // Refresh data
-    } catch (err) {
-        alert("Gagal menyimpan data: " + err.message);
-    }
-});
+// ============================================================
+// RENDER & FILTER
+// ============================================================
 
-async function deleteItem(id) {
-    if(!confirm("Yakin ingin menghapus barang ini?")) return;
-    
-    try {
-        const { error } = await supabase.from('items').delete().eq('id', id);
-        if (error) throw error;
-        alert("Barang berhasil dihapus!");
-        fetchData();
-    } catch (err) {
-        alert("Gagal menghapus data: " + err.message);
-    }
+const formatRupiah = (n) =>
+    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n || 0);
+
+function updateStats() {
+    let total = 0, out = 0;
+    allItems.forEach(item => {
+        total += parseInt(item.stok_total) || 0;
+        out   += parseInt(item.stok_keluar) || 0;
+    });
+    const ready = Math.max(total - out, 0);
+    document.getElementById('stat-total').innerText = total;
+    document.getElementById('stat-out').innerText   = out;
+    document.getElementById('stat-ready').innerText = ready;
 }
 
-// --- INIT ---
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-});
+function renderCatalog() {
+    const grid = document.getElementById('catalog-grid');
+    grid.innerHTML = '';
+
+    const filtered = currentFilter === 'all'
+        ? allItems
+        : allItems.filter(i => i.kategori === currentFilter);
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:3rem 0;">Tidak ada barang ditemukan.</p>';
+        return;
+    }
+
+    filtered.forEach(item => {
+        const sisa = Math.max((item.stok_total || 0) - (item.stok_keluar || 0), 0);
+        const sisaColor  = sisa > 0 ? '#10b981' : '#ef4444';
+        const sisaLabel  = sisa > 0 ? `Sisa: ${sisa}` : 'Habis';
+        const imgFallback = 'https://placehold.co/300x200/1e293b/f59e0b?text=No+Image';
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="card-img-wrapper">
+                <img src="${item.gambar_url || imgFallback}"
+                     alt="${item.nama}"
+                     class="card-img"
+                     onerror="this.src='${imgFallback}'">
+                <div class="stock-badge" style="color:${sisaColor};">${sisaLabel}</div>
+            </div>
+            <div class="card-content">
+                <span class="card-category">${item.kategori || '-'}</span>
+                <h3 class="card-title">${item.nama || '-'}</h3>
+                <p class="card-desc">${item.deskripsi || ''}</p>
+                <div class="price">${formatRupiah(item.harga)}<span>/hari</span></div>
+                <div class="admin-actions">
+                    <button class="action-btn edit-btn" onclick="openEditModal(${item.id})">
+                        <i class="fa-solid fa-pen"></i> Edit
+                    </button>
+                    <button class="action-btn del-btn" onclick="deleteItem(${item.id})">
+                        <i class="fa-solid fa-trash"></i> Hapus
+                    </button>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function initFilterButtons() {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentFilter = btn.getAttribute('data-filter');
+            renderCatalog();
+        });
+    });
+}
+
+// ============================================================
+// TOAST NOTIFICATION
+// ============================================================
+
+function showToast(message, type = 'success') {
+    const existing = document.getElementById('kc-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'kc-toast';
+    toast.style.cssText = `
+        position: fixed; bottom: 2rem; right: 2rem; z-index: 9999;
+        padding: 1rem 1.5rem; border-radius: 12px; color: #fff;
+        font-family: 'Outfit', sans-serif; font-size: 0.95rem;
+        background: ${type === 'success' ? '#10b981' : '#ef4444'};
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        display: flex; align-items: center; gap: 0.6rem;
+        animation: slideInToast 0.3s ease;
+    `;
+    toast.innerHTML = `<i class="fa-solid fa-${type === 'success' ? 'circle-check' : 'circle-exclamation'}"></i> ${message}`;
+
+    // Add animation style once
+    if (!document.getElementById('toast-style')) {
+        const style = document.createElement('style');
+        style.id = 'toast-style';
+        style.textContent = `
+            @keyframes slideInToast {
+                from { opacity: 0; transform: translateY(20px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function errorBox(msg) {
+    return `<div style="grid-column:1/-1;text-align:center;color:#ef4444;
+        padding:2rem;background:var(--bg-card);border-radius:16px;">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size:2rem;margin-bottom:1rem;display:block;"></i>
+        ${msg}</div>`;
+}

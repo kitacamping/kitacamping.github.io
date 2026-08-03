@@ -143,12 +143,12 @@
 
         <div class="filters-container">
             <div class="filters">
-                <button class="filter-btn active" data-filter="all">Semua</button>
-                <button class="filter-btn" data-filter="tenda">Tenda</button>
-                <button class="filter-btn" data-filter="carrier">Tas Carrier</button>
-                <button class="filter-btn" data-filter="masak">Alat Masak</button>
-                <button class="filter-btn" data-filter="tidur">Alat Tidur</button>
-                <button class="filter-btn" data-filter="lainnya">Lainnya</button>
+                <button class="filter-btn active" onclick="setFilter(this,'all')">Semua</button>
+                <button class="filter-btn" onclick="setFilter(this,'tenda')">Tenda</button>
+                <button class="filter-btn" onclick="setFilter(this,'carrier')">Tas Carrier</button>
+                <button class="filter-btn" onclick="setFilter(this,'masak')">Alat Masak</button>
+                <button class="filter-btn" onclick="setFilter(this,'tidur')">Alat Tidur</button>
+                <button class="filter-btn" onclick="setFilter(this,'lainnya')">Lainnya</button>
             </div>
             <button class="btn btn-primary" onclick="openItemModal()">
                 <i class="fa-solid fa-plus"></i> Tambah Barang
@@ -171,6 +171,6 @@
         </div>
     </footer>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

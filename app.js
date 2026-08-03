@@ -267,11 +267,13 @@ function openLoanModal(id) {
     for (var i = 0; i < allItems.length; i++) { if (allItems[i].id === id) { item = allItems[i]; break; } }
     if (!item) { showToast('Data tidak ditemukan!', 'error'); return; }
 
-    var sisa = Math.max((item.stok_total || 0) - (item.stok_keluar || 0), 0);
+    // Gunakan getActiveLoanCount — konsisten dengan tampilan kartu
+    var activeBorrowed = getActiveLoanCount(id);
+    var sisa = Math.max((item.stok_total || 0) - activeBorrowed, 0);
     if (sisa <= 0) { showToast('Stok barang ini sudah habis!', 'error'); return; }
 
     // Fill item info
-    document.getElementById('loan-item-id').value      = item.id;
+    document.getElementById('loan-item-id').value       = item.id;
     document.getElementById('loan-item-name').innerText = item.nama || '-';
     document.getElementById('loan-item-stock').innerText = 'Sisa stok tersedia: ' + sisa + ' unit';
     var imgEl = document.getElementById('loan-item-img');
@@ -284,10 +286,10 @@ function openLoanModal(id) {
     jumlahInput.value = 1;
 
     // Reset form
-    document.getElementById('loan-nama').value     = '';
-    document.getElementById('loan-lama').value     = '1';
-    document.getElementById('loan-jaminan').value  = '';
-    document.getElementById('loan-catatan').value  = '';
+    document.getElementById('loan-nama').value    = '';
+    document.getElementById('loan-lama').value    = '1';
+    document.getElementById('loan-jaminan').value = '';
+    document.getElementById('loan-catatan').value = '';
 
     document.getElementById('loan-modal').classList.add('active');
 }
